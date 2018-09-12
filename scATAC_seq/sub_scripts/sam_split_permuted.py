@@ -4,6 +4,23 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
+from Levenshtein import distance
+
+def find_P7_P5_barcode(index, P7_P5_barcodes):
+    '''
+    this function accept a P7_P5 barcode in the read, and a list of P7_P5 barcodes provided,
+    and then find the barcode in the P7_P5 barcode list that match the index with distance <2,
+    then return the found barcode; if no barcode is found, then return -1
+    '''
+    result = -1
+
+    for barcode in P7_P5_barcodes:
+        diff = distance(index, barcode)
+        if (diff <= 1):
+            result = barcode
+            break
+    
+    return result
 
 def samfile_barcode_count(sam_file, barcode_file):
     
@@ -24,7 +41,9 @@ def samfile_barcode_count(sam_file, barcode_file):
         else:
             name = (((line.split('\t'))[0]).split(','))
             barcode = name[0]
-            barcode_dic[barcode] += 1
+            barcode = find_P7_P5_barcode(barcode, barcode_ls)
+            if (barcode != -1):
+                barcode_dic[barcode] += 1
     sam.close()
     return barcode_dic
 
@@ -36,7 +55,8 @@ def permute_samples(sam_file, barcode_count, barcode_list, output_folder):
     '''
     
     # Generate a list of output file
-    file_name = (sam_file.split('/')[-1]).split('.')[0]
+    file_name = (sam_file.split('/')[-1]).split('.')
+    file_name = file_name[0] + '.' + file_name[1]
     output_files = {}
     for barcode in barcode_list:
         output_file = output_folder + '/' + file_name + '.' + barcode + '.permuted.sam'
@@ -56,6 +76,8 @@ def permute_samples(sam_file, barcode_count, barcode_list, output_folder):
     
     # for each barcode, generate the permuted line array
     # for each barcode, output the permuted lines to the output file
+    
+    
     permuted_lines = np.random.permutation(all_lines[header_number:])
     first_line = 0
     for barcode in barcode_list:
@@ -64,6 +86,7 @@ def permute_samples(sam_file, barcode_count, barcode_list, output_folder):
         for output_line in output_lines:
             output_files[barcode].write(output_line)
         first_line = end_line
+    
     
     # close the output file and sam file
     for barcode in barcode_list:
@@ -82,8 +105,11 @@ def split_samfile(sam_file, barcode_file, output_folder, cutoff):
     # generate the count per barcode
     barcode_count = samfile_barcode_count(sam_file, barcode_file)
     
+    
     # plot the barcode reads distribution and save the result to the ouput folder
-    plot_name = (sam_file.split('/')[-1]).split('.')[0]
+    plot_name = (sam_file.split('/')[-1]).split('.')
+    plot_name = plot_name[0] + '.' + plot_name[1]
+    '''
     fig = plt.figure()
     plt.hist(barcode_count.values(), bins=100)
     plt.ylabel('frequency')
@@ -91,6 +117,7 @@ def split_samfile(sam_file, barcode_file, output_folder, cutoff):
     fig_output = output_folder + '/' + plot_name + '.png'
     
     fig.savefig(fig_output)
+    '''
 
     #also output the barcode number and distribution to the output folder
     read_dist = open(output_folder + '/' + plot_name + '.txt', 'w')
@@ -104,11 +131,13 @@ def split_samfile(sam_file, barcode_file, output_folder, cutoff):
     for barcode in barcode_count:
         if barcode_count[barcode] >= cutoff:
             barcode_filtered.append(barcode)
-    #print barcode_filtered
-     
+    print barcode_filtered
+    
+    '''
     # for the barcode in the barcode filter list, generate permuted sample in the output folder
     print "Generatign permuted sequences..."
     permute_samples(sam_file, barcode_count, barcode_filtered, output_folder)
+    '''
     
     #generate the output sam file and sample_list file
     sample_list_file = open(output_folder + '/' + plot_name + '.' + 'sample_list.txt', 'w')
@@ -126,7 +155,8 @@ def split_samfile(sam_file, barcode_file, output_folder, cutoff):
                 output_files[barcode].write(line)
         else:
             barcode = (((line.split('\t'))[0]).split(','))[0]
-            if barcode in barcode_filtered:
+            barcode = find_P7_P5_barcode(barcode, barcode_filtered)
+            if (barcode != -1):
                 output_files[barcode].write(line)
     
     #close the files:

@@ -1,3 +1,4 @@
+# this script summary the peak count output result from the peak_count.sh
 
 args = commandArgs(trailingOnly=TRUE)
 peak_count_folder = args[1]

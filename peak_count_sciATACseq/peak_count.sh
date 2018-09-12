@@ -1,40 +1,33 @@
-
 #!/bin/bash
 
-# this script takes single cell ATAC-seq data and generate the peak count object
+# this script takes single cell ATAC-seq data and generate the peak count result
+# From scATAC-seq data, I am going to accept the folder of the scATAC-seq data (single cell sam files), sample name for each sample, and a reference bed file for peak counting and then:
+# For each cell in the provided samples, calculate the number of reads falling into each peaks. Return the sparse matrix with the sample id, peak id and read number; the sample matrix, which is the sample id and sample name; the feature matrix, which is the peak id and peak information (peak location, promoter/not promoter)
 
-# From scATAC-seq data, I am going to accept the folder of the scATAC-seq data (sam files), sample name for each sample and then:
+# reference folder for generating the peak bed reference 
+reference_folder="/net/shendure/vol1/home/cao1025/Projects/processed_data/180120_coassay_kidney/data/ATAC_raw/agg_cell_type/reference_folder/"
 
-# (1) Combine the scATAC-seq data for the samples.
+# sample list for single cell sam files
+sample_list="/net/shendure/vol1/home/cao1025/Projects/processed_data/180120_coassay_kidney/data/pData/180211_ATAC_sample_sc_id.txt"
 
-# (2) use MACS for peak calling.
+# sam folder for single cell sam files
+sam_folder="/net/shendure/vol1/home/cao1025/Projects/processed_data/180120_coassay_kidney/data/ATAC_raw/single_cell_sam/"
 
-# (3) Define promoter peaks (the union of the annotated transcription start site (TSS) (Gencode V17) minus 500 base pairs) (same with Hannah)
+# output folder for the peak count matrix
+all_output="/net/shendure/vol1/home/cao1025/Projects/processed_data/180120_coassay_kidney/data/ATAC_raw/peak_count/"
 
-# (4) Merge the promoter peaks and the MACS peaks, and produce a bed file for the merged peaks,
-# and it also include the information (promoter?) and gene name (if it is a promoter).
-
-# (5) For each cell in the provided samples, calculate the number of reads falling into each peaks. Return the sparse matrix with the sample id, peak id and read number; the sample matrix, which is the sample id and sample name; the feature matrix, which is the peak id and peak information (peak location, promoter/not promoter)
-
-main_folder="../../nobackup/170624/scATAC_output/"
-reference_folder=""
-
-sample_list=$main_folder/barcode_samples.txt
-sam_folder=$main_folder/rmdup_splitted/
-reads_report_folder=$main_folder/report/
-all_output=$main_folder/peak_count
 peak_count_folder=$all_output/peak_cout/
 summary_folder=$all_output/summary_count/
 merge_file=$reference_folder/merged.bed
 
-core=10
+core=4
 
 mkdir -p $peak_count_folder
 mkdir -p $summary_folder
 
 script_folder="/net/shendure/vol1/home/cao1025/analysis_script/ATAC_RNA_coassay_pipe/scATAC_seq/peak_count_sciATACseq/"
 python_use="/net/shendure/vol1/home/cao1025/anaconda3/bin/python3.6"
-dis=50 # define the length of entending the reads from the tagmentation site for peak counting
+dis=100 # define the length of entending the reads from the tagmentation site for peak counting
 pure_limit=0.85 # the limit for define human and mouse cells
 
 
@@ -68,6 +61,6 @@ echo All files are combined.
 # including cell name, human reads, mouse reads, total reads, human peak 
 # reads, mouse peak reads, total peak reads, total peak number
 
-script=$script_folder/peak_count_summary.r
-Rscript $script $peak_count_folder $reference_folder $reads_report_folder $summary_folder $pure_limit
+script=$script_folder/peak_count_summary_no_report.r
+Rscript $script $peak_count_folder $reference_folder $summary_folder
 echo peak count summary generated.

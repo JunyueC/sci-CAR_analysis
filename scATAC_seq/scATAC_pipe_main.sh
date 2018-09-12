@@ -1,18 +1,36 @@
-read1="../../nobackup/170701/fastq_ATAC_2/Undetermined_S0_R1_001.fastq.gz"
-read2="../../nobackup/170701/fastq_ATAC_2/Undetermined_S0_R2_001.fastq.gz"
-output_folder="../../nobackup/170701/scATAC_output_2/"
-P7_index="./P7_index.txt"
-P5_index="./P5_index.txt"
+
+# This script accepts the sequencing run from sci-ATAC-seq part of sci-CAR, and output single
+# cell sam files for downstream processing
+# all sub scripts are uploaded to the sci-CAR_analysis repository in the scATAC_seq/sub_scripts folder
+
+# define the read1 and read2 fastq files from the sequencing run
+read1="/net/shendure/vol1/home/cao1025/Projects/nobackup/180120_coATAC/fastq_1/Undetermined_S0_R1_001.fastq.gz"
+read2="/net/shendure/vol1/home/cao1025/Projects/nobackup/180120_coATAC/fastq_1/Undetermined_S0_R2_001.fastq.gz"
+
+# define the output folder
+output_folder="/net/shendure/vol1/home/cao1025/Projects/nobackup/180120_coATAC/output_1/"
+
+# define the PCR barcodes (P5 and P7) for each PCR wells (the P5 and P7 should match with each other)
+P7_index="./P7.txt"
+P5_index="./P5.txt"
+
+# define all possible combinations of Tn5 barcodes (note: the Tn5 barcodes in miseq and nextseq would be different)
 barcode_file="/net/shendure/vol1/home/cao1025/analysis_script/ATAC_RNA_coassay_pipe/N7_N5_barcode_nextseq.txt"
-core=5
+
+# define the core number
+core=10
+
+# define the cutoff value of unqiues reads for single cell
 cutoff=1000
 
+# define the script folder (all sub scripts are uploaded to the sci-CAR_analysis repository in the scATAC_seq folder)
 script_folder="/net/shendure/vol1/home/cao1025/analysis_script/ATAC_RNA_coassay_pipe/scATAC_seq/"
+
+# define the python2.7 location
 python="/net/shendure/vol1/home/cao1025/anaconda2/bin/python2.7"
-index="/net/shendure/vol1/home/cao1025/reference/index/STAR/STAR_hs37d5_mm10/"
 
-dhs_bed="/net/shendure/vol1/home/cao1025/reference/bed_reference/mm10_hg19/dnase_hot_spot/3T3_293T_combined_hotspot_simp.bed"
-
+# define the location of mapping index (STAR)
+index="/net/shendure/vol10/projects/scRNA/reference/index/STAR/STAR_mm10_RNAseq/"
 
 
 # read in the read1 and read2, and P5 barcode, P7 barcode and then split the read1 and read2 based on the P5 barcode
@@ -29,12 +47,12 @@ echo $(date)
 module load python/2.7.3
 module load cutadapt/1.8.3
 module load trim_galore/0.4.1
+
 mkdir $output_folder/trimmed_fastq
 trimmed_fastq=$output_folder/trimmed_fastq
 sample_ID=$output_folder/fastq/sample_ID.txt
 mkdir -p $trimmed_fastq
-for sample in $(cat $sample_ID); do echo trimming $sample; sem -j $core trim_galore $fastq_folder/$sample*R1*.gz $fastq_folder/$sample*R2*.gz --paired -a CTGTCTCTTATA -a2 CTGTCTCTTATA --three_prime_clip_R1 1 --three_prime_clip_R2 1 -o $trimmed_fastq; done
-sem --semaphoretimeout 600
+for sample in $(cat $sample_ID); do echo trimming $sample; trim_galore $fastq_folder/$sample*R1*.gz $fastq_folder/$sample*R2*.gz --paired -a CTGTCTCTTATA -a2 CTGTCTCTTATA --three_prime_clip_R1 1 --three_prime_clip_R2 1 -o $trimmed_fastq; done
 echo "All trimmed file generated."
 module unload python/2.7.3
 
@@ -60,17 +78,16 @@ STAR --genomeDir $index --genomeLoad Remove
 echo "all alignment done"
 
 
-# This function accept a input bowtie2  folder, a sample ID file and a output folder, and then filter the reads: remove the mitochondrial reads, samtools -F4 -q 30, sort the file and use picard to remove the dupllicate; and output the mapped reads into the mapped folder of the output folder, output the remove duplicates reads into the rm_dup folder of the output folder
+# This function accept a alignment folder, a sample ID file and a output folder, and then filter the reads: remove the mitochondrial reads, samtools -F4 -q 30, sort the file and use picard to remove the dupllicate; and output the mapped reads into the mapped folder of the output folder, output the remove duplicates reads into the rm_dup folder of the output folder
 input_folder=$STAR_folder
 sample_ID=$output_folder/fastq/sample_ID.txt
 filtered_folder=$output_folder/filtered_bam
 # make the output folder
 mkdir -p $filtered_folder
 mkdir $filtered_folder/mapped_bam
-
 # filter the files and generate the mapped bam file
-for sample in $(cat $sample_ID); do echo "generating mapped bam file" $sample; sem -j $core samtools view -h -F 4 -q 30 $input_folder/$sample*.sam |awk '$3 != "MT" && $3 != "chrM"' -|samtools view -bh -|samtools sort -|samtools view -bh>$filtered_folder/mapped_bam/$sample.bam; done
-sem --semaphoretimeout 600
+for sample in $(cat $sample_ID); do echo "generating mapped bam file" $sample; samtools view -h -F 4 -q 30 $input_folder/$sample*.sam |awk '$3 != "MT" && $3 != "chrM"' -|samtools view -bh -|samtools sort -|samtools view -bh>$filtered_folder/mapped_bam/$sample.bam; done
+
 echo All mapped file generated~
 
 # Transform the bam files to sam files
@@ -79,8 +96,8 @@ sample_list=$output_folder/fastq/sample_ID.txt
 splitted_folder=$output_folder/splitted_sam
 # first convert the bam files into sam files
 echo convert bam files to sam files...
-for sample in $(cat $sample_list); do echo converting $sample; sem -j $core samtools view -h $bam_folder/$sample.bam>$bam_folder/$sample.sam; done
-sem --semaphoretimeout 600
+for sample in $(cat $sample_list); do echo converting $sample; samtools view -h $bam_folder/$sample.bam>$bam_folder/$sample.sam; done
+
 echo All bam files are converted to sam files.
 
 echo Start splitting the sam files based on the barcode...
@@ -96,13 +113,15 @@ mkdir -p $rmdup_folder
 for sample in $(cat $sample_list); do echo remove duplicates $sample; samtools rmdup $splitted_folder/$sample.sam $rmdup_folder/$sample.bam; done
 echo removing duplicates done~
 
+# transform bam file to sam file
+sample_list=$output_folder/barcode_samples.txt
+rmdup_folder=$output_folder/rmdup_splitted
+for sample in $(cat $sample_list); do echo transform bam to sam $sample; samtools view -h $rmdup_folder/$sample.bam >$rmdup_folder/$sample.sam; done
+
 echo "Start calculating the human and mouse reads number..."
 bash $script_folder/report_human_mouse_fraction_bam.sh $rmdup_folder $output_folder/barcode_samples.txt $output_folder/report/human_mouse_read_number
 
-echo "Calculate the fragment size distribution...."
-bash $script_folder/frag_size.sh $rmdup_folder $output_folder/barcode_samples.txt $output_folder/report/frag_size $core
-echo "All fragment size calculation is done."
-
+# The following is some basic QC analysis (reads number per step, reads number per cell and others)
 
 # calculate the reads number
 # this script accept the input parental folder, create a report folder and a read_number sub folder, and for each sample, 
@@ -133,5 +152,9 @@ split_folder=$output_folder/splitted_sam
 rmdup_folder=$output_folder/rmdup_splitted
 mkdir -p $report_folder
 for sample in $(cat $sample_list); do echo calculating $sample; echo $sample, $(samtools view $split_folder/$sample.sam |wc -l), $(samtools view $rmdup_folder/$sample.bam |wc -l) >>$report_folder/rmdup_report.csv; done
+
+echo "Calculate the fragment size distribution...."
+bash $script_folder/frag_size.sh $output_folder/rmdup_splitted $output_folder/barcode_samples.txt $output_folder/report/frag_size $core
+echo "All fragment size calculation is done."
 
 echo "all analysis is done"
