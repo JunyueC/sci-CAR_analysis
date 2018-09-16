@@ -7,3 +7,4 @@ peak_count_sciATACseq folder includes scripts for gernerating single cell ATAC-s
 
 scRNA_seq_pipe includes scripts for processing sci-RNA-seq part of sci-CAR (from fastq files to single cell gene count matrix).
 
+primer_sciRNA_ATAC_seq.xlsx include RT and PCR primers for sci-RNA-seq and sci-ATAC-seq (sci-CAR).
